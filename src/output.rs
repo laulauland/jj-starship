@@ -8,12 +8,10 @@ use crate::color::{BLUE, GREEN, PURPLE, RED, RESET};
 use crate::config::Config;
 #[cfg(feature = "git")]
 use crate::git::GitInfo;
-#[cfg(feature = "jj")]
 use crate::jj::JjInfo;
 
 /// Format JJ info as prompt string
 /// Pattern: `on {symbol}{name} ({id}) [{status}]`
-#[cfg(feature = "jj")]
 pub fn format_jj(info: &JjInfo, config: &Config) -> String {
     let mut out = String::with_capacity(128);
     let display = &config.jj_display;
@@ -170,7 +168,6 @@ mod tests {
 
     #[cfg(feature = "git")]
     use crate::config::DEFAULT_GIT_SYMBOL;
-    #[cfg(feature = "jj")]
     use crate::config::DEFAULT_JJ_SYMBOL;
     use crate::config::DisplayConfig;
 
@@ -191,7 +188,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "jj")]
     #[test]
     fn test_jj_format_clean() {
         let info = JjInfo {
@@ -209,7 +205,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "jj")]
     #[test]
     fn test_jj_format_dirty() {
         // When bookmark is None, name = change_id, so (change_id) is skipped (dedupe)
@@ -228,7 +223,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "jj")]
     #[test]
     fn test_jj_format_with_symbol() {
         let info = JjInfo {
@@ -248,7 +242,6 @@ mod tests {
         );
     }
 
-    #[cfg(feature = "jj")]
     #[test]
     fn test_jj_format_truncated() {
         let config = Config {

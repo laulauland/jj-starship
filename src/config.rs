@@ -39,10 +39,12 @@ pub struct Config {
     /// Symbol prefix for JJ repos
     pub jj_symbol: Cow<'static, str>,
     /// Symbol prefix for Git repos
+    #[cfg_attr(not(feature = "git"), allow(dead_code))]
     pub git_symbol: Cow<'static, str>,
     /// JJ display options
     pub jj_display: DisplayConfig,
     /// Git display options
+    #[cfg_attr(not(feature = "git"), allow(dead_code))]
     pub git_display: DisplayConfig,
 }
 
