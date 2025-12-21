@@ -1,14 +1,19 @@
 //! Output formatting for prompt strings
 
+use std::borrow::Cow;
+#[cfg(feature = "git")]
 use std::fmt::Write;
 
 use crate::color::{BLUE, GREEN, PURPLE, RED, RESET};
 use crate::config::Config;
+#[cfg(feature = "git")]
 use crate::git::GitInfo;
+#[cfg(feature = "jj")]
 use crate::jj::JjInfo;
 
 /// Format JJ info as prompt string
 /// Pattern: `on {symbol}{name} ({id}) [{status}]`
+#[cfg(feature = "jj")]
 pub fn format_jj(info: &JjInfo, config: &Config) -> String {
     let mut out = String::with_capacity(128);
     let display = &config.jj_display;
@@ -22,10 +27,10 @@ pub fn format_jj(info: &JjInfo, config: &Config) -> String {
     }
 
     // Name in purple (bookmark or change_id prefix)
-    let name = info
+    let name: Cow<str> = info
         .bookmark
         .as_ref()
-        .map_or_else(|| info.change_id.clone(), |bm| config.truncate(bm));
+        .map_or(Cow::Borrowed(&info.change_id), |bm| config.truncate(bm));
 
     if display.show_name {
         out.push_str(PURPLE);
@@ -34,7 +39,7 @@ pub fn format_jj(info: &JjInfo, config: &Config) -> String {
     }
 
     // ID in green - skip if same as name (deduplicate)
-    if display.show_id && name != info.change_id {
+    if display.show_id && *name != info.change_id {
         if !out.is_empty() {
             out.push(' ');
         }
@@ -78,6 +83,7 @@ pub fn format_jj(info: &JjInfo, config: &Config) -> String {
 
 /// Format Git info as prompt string
 /// Pattern: `on {symbol}{name} ({id}) [{status}]`
+#[cfg(feature = "git")]
 pub fn format_git(info: &GitInfo, config: &Config) -> String {
     let mut out = String::with_capacity(128);
     let display = &config.git_display;
@@ -92,10 +98,10 @@ pub fn format_git(info: &GitInfo, config: &Config) -> String {
 
     // Name in purple (branch or HEAD)
     if display.show_name {
-        let name = info
+        let name: Cow<str> = info
             .branch
             .as_ref()
-            .map_or_else(|| "HEAD".to_string(), |b| config.truncate(b));
+            .map_or(Cow::Borrowed("HEAD"), |b| config.truncate(b));
         out.push_str(PURPLE);
         out.push_str(&name);
         out.push_str(RESET);
@@ -160,23 +166,32 @@ pub fn format_git(info: &GitInfo, config: &Config) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{DEFAULT_GIT_SYMBOL, DEFAULT_JJ_SYMBOL, DisplayConfig};
+    use std::borrow::Cow;
 
+    #[cfg(feature = "git")]
+    use crate::config::DEFAULT_GIT_SYMBOL;
+    #[cfg(feature = "jj")]
+    use crate::config::DEFAULT_JJ_SYMBOL;
+    use crate::config::DisplayConfig;
+
+    #[allow(dead_code)]
     fn default_config() -> Config {
         Config::default()
     }
 
+    #[allow(dead_code)]
     fn no_symbol_config() -> Config {
         Config {
             truncate_name: 0,
             id_length: 8,
-            jj_symbol: String::new(),
-            git_symbol: String::new(),
+            jj_symbol: Cow::Borrowed(""),
+            git_symbol: Cow::Borrowed(""),
             jj_display: DisplayConfig::all_visible(),
             git_display: DisplayConfig::all_visible(),
         }
     }
 
+    #[cfg(feature = "jj")]
     #[test]
     fn test_jj_format_clean() {
         let info = JjInfo {
@@ -194,6 +209,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "jj")]
     #[test]
     fn test_jj_format_dirty() {
         // When bookmark is None, name = change_id, so (change_id) is skipped (dedupe)
@@ -212,6 +228,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "jj")]
     #[test]
     fn test_jj_format_with_symbol() {
         let info = JjInfo {
@@ -231,13 +248,14 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "jj")]
     #[test]
     fn test_jj_format_truncated() {
         let config = Config {
             truncate_name: 5,
             id_length: 8,
-            jj_symbol: String::new(),
-            git_symbol: String::new(),
+            jj_symbol: Cow::Borrowed(""),
+            git_symbol: Cow::Borrowed(""),
             jj_display: DisplayConfig::all_visible(),
             git_display: DisplayConfig::all_visible(),
         };
@@ -256,6 +274,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "git")]
     #[test]
     fn test_git_format_clean() {
         let info = GitInfo {
@@ -275,6 +294,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "git")]
     #[test]
     fn test_git_format_dirty() {
         let info = GitInfo {
@@ -296,6 +316,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "git")]
     #[test]
     fn test_git_format_with_symbol() {
         let info = GitInfo {

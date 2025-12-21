@@ -18,6 +18,18 @@ cd jj-starship
 cargo install --path .
 ```
 
+## Feature Flags
+
+Both `git` and `jj` features are enabled by default. Disable either to compile out the unused backend:
+
+```sh
+# JJ only (excludes git2 dependency)
+cargo install --no-default-features -F jj jj-starship
+
+# Git only (excludes jj-lib dependency)
+cargo install --no-default-features -F git jj-starship
+```
+
 ## Starship Configuration
 
 Add to `~/.config/starship.toml`:

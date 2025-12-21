@@ -1,5 +1,6 @@
 //! Configuration for jj-starship
 
+use std::borrow::Cow;
 use std::env;
 
 /// Default symbol for JJ repos
@@ -36,9 +37,9 @@ pub struct Config {
     /// Length of `change_id/commit` hash to display
     pub id_length: usize,
     /// Symbol prefix for JJ repos
-    pub jj_symbol: String,
+    pub jj_symbol: Cow<'static, str>,
     /// Symbol prefix for Git repos
-    pub git_symbol: String,
+    pub git_symbol: Cow<'static, str>,
     /// JJ display options
     pub jj_display: DisplayConfig,
     /// Git display options
@@ -50,8 +51,8 @@ impl Default for Config {
         Self {
             truncate_name: 0, // unlimited
             id_length: 8,
-            jj_symbol: DEFAULT_JJ_SYMBOL.into(),
-            git_symbol: DEFAULT_GIT_SYMBOL.into(),
+            jj_symbol: Cow::Borrowed(DEFAULT_JJ_SYMBOL),
+            git_symbol: Cow::Borrowed(DEFAULT_GIT_SYMBOL),
             jj_display: DisplayConfig::all_visible(),
             git_display: DisplayConfig::all_visible(),
         }
@@ -101,14 +102,14 @@ impl Config {
             .unwrap_or(8);
 
         let (jj_symbol, git_symbol) = if no_symbol {
-            (String::new(), String::new())
+            (Cow::Borrowed(""), Cow::Borrowed(""))
         } else {
             let jj = jj_symbol
                 .or_else(|| env::var("JJ_STARSHIP_JJ_SYMBOL").ok())
-                .unwrap_or_else(|| DEFAULT_JJ_SYMBOL.into());
+                .map_or(Cow::Borrowed(DEFAULT_JJ_SYMBOL), Cow::Owned);
             let git = git_symbol
                 .or_else(|| env::var("JJ_STARSHIP_GIT_SYMBOL").ok())
-                .unwrap_or_else(|| DEFAULT_GIT_SYMBOL.into());
+                .map_or(Cow::Borrowed(DEFAULT_GIT_SYMBOL), Cow::Owned);
             (jj, git)
         };
 
@@ -123,13 +124,14 @@ impl Config {
     }
 
     /// Truncate a string to max length, adding ellipsis if needed
-    pub fn truncate(&self, s: &str) -> String {
-        if self.truncate_name == 0 || s.len() <= self.truncate_name {
-            s.to_string()
+    pub fn truncate<'a>(&self, s: &'a str) -> Cow<'a, str> {
+        if self.truncate_name == 0 || s.chars().count() <= self.truncate_name {
+            Cow::Borrowed(s)
         } else if self.truncate_name <= 1 {
-            "…".to_string()
+            Cow::Borrowed("…")
         } else {
-            format!("{}…", &s[..self.truncate_name - 1])
+            let truncated: String = s.chars().take(self.truncate_name - 1).collect();
+            Cow::Owned(truncated + "…")
         }
     }
 }

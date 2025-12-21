@@ -31,46 +31,7 @@ pub struct GitInfo {
 pub fn collect(repo_root: &Path, id_length: usize) -> Result<GitInfo> {
     let repo = Repository::open(repo_root).map_err(|e| Error::Git(format!("open: {e}")))?;
 
-    // Get HEAD - may fail if no commits yet
-    let Ok(head) = repo.head() else {
-        // No commits yet - try to get branch from HEAD reference
-        let branch = repo
-            .find_reference("HEAD")
-            .ok()
-            .and_then(|r| r.symbolic_target().map(std::string::ToString::to_string))
-            .and_then(|s| s.strip_prefix("refs/heads/").map(String::from));
-
-        return Ok(GitInfo {
-            branch,
-            head_short: "empty".into(),
-            staged: 0,
-            modified: 0,
-            untracked: count_untracked(&repo),
-            deleted: 0,
-            conflicted: 0,
-            ahead: 0,
-            behind: 0,
-        });
-    };
-    let detached = repo
-        .head_detached()
-        .map_err(|e| Error::Git(format!("head_detached: {e}")))?;
-
-    // Branch name
-    let branch = if detached {
-        None
-    } else {
-        head.shorthand().map(String::from)
-    };
-
-    // Short commit hash
-    let head_commit = head
-        .peel_to_commit()
-        .map_err(|e| Error::Git(format!("peel_to_commit: {e}")))?;
-    let full_hash = head_commit.id().to_string();
-    let head_short = full_hash[..id_length.min(full_hash.len())].to_string();
-
-    // Status counts
+    // Status counts - compute once for both empty and normal repos
     let mut opts = StatusOptions::new();
     opts.include_untracked(true)
         .recurse_untracked_dirs(false)
@@ -108,7 +69,7 @@ pub fn collect(repo_root: &Path, id_length: usize) -> Result<GitInfo> {
         }
 
         // Working tree changes
-        if status.contains(Status::WT_MODIFIED) || status.contains(Status::WT_TYPECHANGE) {
+        if status.intersects(Status::WT_MODIFIED | Status::WT_TYPECHANGE) {
             modified += 1;
         }
         if status.contains(Status::WT_DELETED) {
@@ -118,6 +79,46 @@ pub fn collect(repo_root: &Path, id_length: usize) -> Result<GitInfo> {
             untracked += 1;
         }
     }
+
+    // Get HEAD - may fail if no commits yet
+    let Ok(head) = repo.head() else {
+        // No commits yet - try to get branch from HEAD reference
+        let branch = repo
+            .find_reference("HEAD")
+            .ok()
+            .and_then(|r| r.symbolic_target().map(std::string::ToString::to_string))
+            .and_then(|s| s.strip_prefix("refs/heads/").map(String::from));
+
+        return Ok(GitInfo {
+            branch,
+            head_short: "empty".into(),
+            staged,
+            modified,
+            untracked,
+            deleted,
+            conflicted,
+            ahead: 0,
+            behind: 0,
+        });
+    };
+
+    let detached = repo
+        .head_detached()
+        .map_err(|e| Error::Git(format!("head_detached: {e}")))?;
+
+    // Branch name
+    let branch = if detached {
+        None
+    } else {
+        head.shorthand().map(String::from)
+    };
+
+    // Short commit hash
+    let head_commit = head
+        .peel_to_commit()
+        .map_err(|e| Error::Git(format!("peel_to_commit: {e}")))?;
+    let full_hash = head_commit.id().to_string();
+    let head_short = full_hash[..id_length.min(full_hash.len())].to_string();
 
     // Ahead/behind upstream
     let (ahead, behind) = get_ahead_behind(&repo, &head).unwrap_or((0, 0));
@@ -133,24 +134,6 @@ pub fn collect(repo_root: &Path, id_length: usize) -> Result<GitInfo> {
         ahead,
         behind,
     })
-}
-
-/// Count untracked files (for repos with no commits)
-fn count_untracked(repo: &Repository) -> usize {
-    let mut opts = StatusOptions::new();
-    opts.include_untracked(true)
-        .recurse_untracked_dirs(false)
-        .include_ignored(false)
-        .exclude_submodules(true);
-
-    repo.statuses(Some(&mut opts))
-        .map(|statuses| {
-            statuses
-                .iter()
-                .filter(|e| e.status().contains(Status::WT_NEW))
-                .count()
-        })
-        .unwrap_or(0)
 }
 
 /// Get ahead/behind counts relative to upstream
